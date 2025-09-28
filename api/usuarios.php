@@ -1,32 +1,30 @@
 <?php
-require_once "../conexion.php";
+require_once "../conexion.php"; // este ya incluye R::setup
 
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
         // Listar todos los usuarios
-        $stmt = $pdo->query("SELECT * FROM usuarios");
-        echo json_encode($stmt->fetchAll());
+        $usuarios = R::findAll('usuarios');
+        echo json_encode(R::exportAll($usuarios));
         break;
 
     case 'POST':
         // Insertar nuevo usuario
         $data = json_decode(file_get_contents("php://input"), true);
 
-        $stmt = $pdo->prepare("INSERT INTO usuarios
-            (nombre, apellido, dni, direccion, telefono, cargo, responsabilidad, usuario) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $data['nombre'],
-            $data['apellido'],
-            $data['dni'],
-            $data['direccion'],
-            $data['telefono'],
-            $data['cargo'],
-            $data['responsabilidad'],
-            $data['usuario']
-        ]);
+        $usuario = R::dispense('usuarios');
+        $usuario->nombre          = $data['nombre'];
+        $usuario->apellido        = $data['apellido'];
+        $usuario->dni             = $data['dni'];
+        $usuario->direccion       = $data['direccion'];
+        $usuario->telefono        = $data['telefono'];
+        $usuario->cargo           = $data['cargo'];
+        $usuario->responsabilidad = $data['responsabilidad'];
+        $usuario->usuario         = $data['usuario'];
+
+        R::store($usuario);
         echo json_encode(["status" => "success"]);
         break;
 
@@ -34,28 +32,34 @@ switch ($method) {
         // Actualizar usuario
         $data = json_decode(file_get_contents("php://input"), true);
 
-        $stmt = $pdo->prepare("UPDATE usuarios 
-            SET nombre=?, apellido=?, dni=?, direccion=?, telefono=?, cargo=?, responsabilidad=?, usuario=? 
-            WHERE id=?");
-        $stmt->execute([
-            $data['nombre'],
-            $data['apellido'],
-            $data['dni'],
-            $data['direccion'],
-            $data['telefono'],
-            $data['cargo'],
-            $data['responsabilidad'],
-            $data['usuario'],
-            $data['id']
-        ]);
-        echo json_encode(["status" => "updated"]);
+        $usuario = R::load('usuarios', $data['id']);
+        if ($usuario->id) {
+            $usuario->nombre          = $data['nombre'];
+            $usuario->apellido        = $data['apellido'];
+            $usuario->dni             = $data['dni'];
+            $usuario->direccion       = $data['direccion'];
+            $usuario->telefono        = $data['telefono'];
+            $usuario->cargo           = $data['cargo'];
+            $usuario->responsabilidad = $data['responsabilidad'];
+            $usuario->usuario         = $data['usuario'];
+
+            R::store($usuario);
+            echo json_encode(["status" => "updated"]);
+        } else {
+            echo json_encode(["status" => "error", "message" => "Usuario no encontrado"]);
+        }
         break;
 
     case 'DELETE':
         // Eliminar usuario
         parse_str(file_get_contents("php://input"), $data);
-        $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id=?");
-        $stmt->execute([$data['id']]);
-        echo json_encode(["status" => "deleted"]);
+
+        $usuario = R::load('usuarios', $data['id']);
+        if ($usuario->id) {
+            R::trash($usuario);
+            echo json_encode(["status" => "deleted"]);
+        } else {
+            echo json_encode(["status" => "error", "message" => "Usuario no encontrado"]);
+        }
         break;
 }
